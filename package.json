@@ -1,0 +1,16 @@
+{
+  "name": "smart-grainer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SmartGrainer Sampler - Rust (WASM) + React + PixiJS + AudioWorklet",
+  "scripts": {
+    "build:wasm": "cd audio-engine && wasm-pack build --target web",
+    "dev": "cd frontend && pnpm run dev",
+    "build": "pnpm run build:wasm && cd frontend && pnpm run build",
+    "install:frontend": "cd frontend && pnpm install",
+    "install:all": "pnpm run install:frontend"
+  },
+  "workspaces": [
+    "frontend"
+  ]
+}

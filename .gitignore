@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build outputs
+audio-engine/pkg/
+frontend/dist/
+frontend/build/
+*.wasm
+*.wasm.map
+
+# Rust
+audio-engine/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE
+.playwright-mcp/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Vite
+frontend/.vite/
