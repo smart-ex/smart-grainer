@@ -1,10 +1,8 @@
 .App {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
+  @apply w-full max-w-[1800px] mx-auto p-2 md:p-4;
+  min-height: 100vh;
 }
 
 h1 {
-  margin-bottom: 2rem;
+  @apply text-2xl md:text-3xl font-bold mb-4 text-center;
 }

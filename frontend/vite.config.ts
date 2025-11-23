@@ -15,6 +15,7 @@ export default defineConfig({
     alias: {
       // Resolve 'env' import from WASM package to the env.js file
       'env': path.resolve(__dirname, '../audio-engine/pkg/env.js'),
+      '@': path.resolve(__dirname, './src'),
     },
   },
   server: {

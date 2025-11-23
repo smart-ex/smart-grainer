@@ -1,10 +1,14 @@
-// Granular control component with UI controls
+// Granular control component with modern UI
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useGranularStore } from '../store/useGranularStore';
 import { initWasm, createGranularInstance, isWasmInitialized } from '../wasm';
 import { loadAudioFile, audioBufferToFloat32Array, float32ArrayToAudioBuffer } from '../utils/audio';
-import './GranularControl.css';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Slider } from './ui/slider';
+import { Label } from './ui/label';
+import { Upload, Play, Pause, RotateCcw } from 'lucide-react';
 
 const GranularControl: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -67,11 +71,9 @@ const GranularControl: React.FC = () => {
         await initWasm();
         console.log('WASM initialized');
         
-        // Create granular instance
         const instance = createGranularInstance();
         setGranularInstance(instance);
         
-        // Create AudioContext
         const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         console.log('AudioContext created:', ctx.state);
         
@@ -88,7 +90,6 @@ const GranularControl: React.FC = () => {
     initialize();
     
     return () => {
-      // Cleanup
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -113,7 +114,6 @@ const GranularControl: React.FC = () => {
       return;
     }
     
-    // Ensure AudioContext exists and is running
     let ctx = audioContext;
     if (!ctx) {
       console.log('Creating new AudioContext...');
@@ -121,7 +121,6 @@ const GranularControl: React.FC = () => {
       setAudioContext(ctx);
     }
     
-    // Resume AudioContext if suspended
     if (ctx.state === 'suspended') {
       console.log('Resuming AudioContext...');
       try {
@@ -143,7 +142,6 @@ const GranularControl: React.FC = () => {
       });
       setAudioBuffer(buffer);
       
-      // Set waveform in granular instance
       if (granularInstance && isWasmInitialized()) {
         console.log('Setting waveform in granular instance...');
         const inputData = audioBufferToFloat32Array(buffer);
@@ -158,13 +156,11 @@ const GranularControl: React.FC = () => {
       alert(`Error loading audio file: ${errorMessage}\n\nPlease check the browser console for details.`);
     }
     
-    // Reset input to allow selecting the same file again
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  // Process entire buffer offline
   const processOffline = useCallback(() => {
     if (!granularInstance || !audioBuffer || !isWasmInitialized()) {
       return;
@@ -181,13 +177,11 @@ const GranularControl: React.FC = () => {
       output.set(frame, i * 128);
     }
     
-    // Trim to original length
     const trimmed = output.slice(0, inputData.length);
     setProcessedBuffer(trimmed);
     console.log('Offline processing complete, output length:', trimmed.length);
   }, [granularInstance, audioBuffer, getGranularParams, setProcessedBuffer]);
 
-  // Auto-process when parameters change (throttled)
   useEffect(() => {
     if (!audioBuffer || !isWasmInitialized() || !granularInstance) {
       return;
@@ -195,7 +189,7 @@ const GranularControl: React.FC = () => {
 
     const timeoutId = setTimeout(() => {
       processOffline();
-    }, 100); // Debounce parameter changes
+    }, 100);
 
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -249,295 +243,277 @@ const GranularControl: React.FC = () => {
     return value.toFixed(decimals);
   };
 
+  const ControlSlider = ({ 
+    label, 
+    value, 
+    onChange, 
+    min, 
+    max, 
+    step = 1,
+    format = (v: number) => v.toFixed(0),
+    description 
+  }: {
+    label: string;
+    value: number;
+    onChange: (value: number) => void;
+    min: number;
+    max: number;
+    step?: number;
+    format?: (value: number) => string;
+    description?: string;
+  }) => (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-medium">{label}</Label>
+        <span className="text-xs text-muted-foreground font-mono">{format(value)}</span>
+      </div>
+      <Slider
+        value={[value]}
+        onValueChange={([v]) => onChange(v)}
+        min={min}
+        max={max}
+        step={step}
+        className="w-full"
+      />
+      {description && (
+        <p className="text-[10px] text-muted-foreground">{description}</p>
+      )}
+    </div>
+  );
+
+  const maxLength = audioBuffer?.length || 0;
+
   return (
-    <div className="granular-control">
-      <div className="control-section">
-        <h2>Load Audio</h2>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="audio/*"
-          onChange={handleFileSelect}
-          style={{ display: 'none' }}
-        />
-        <button 
-          onClick={() => {
-            if (fileInputRef.current) {
-              fileInputRef.current.click();
-            }
-          }}
-        >
-          Select Audio File
-        </button>
-        {audioBuffer && (
-          <p>Loaded: {audioBuffer.duration.toFixed(2)}s @ {audioBuffer.sampleRate}Hz</p>
-        )}
-      </div>
+    <div className="w-full space-y-4">
+      {/* Header Controls */}
+      <Card>
+        <CardHeader className="pb-3 px-4 pt-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <Button 
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                className="w-full"
+              >
+                <Upload className="h-4 w-4" />
+                {audioBuffer ? `Loaded: ${audioBuffer.duration.toFixed(2)}s @ ${audioBuffer.sampleRate}Hz` : 'Load Audio File'}
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={processOffline} 
+                disabled={!audioBuffer || !granularInstance}
+                variant="outline"
+                size="sm"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+              <Button 
+                onClick={handlePlay} 
+                disabled={!processedBuffer || !audioContext}
+                variant={isPlaying ? "destructive" : "default"}
+                size="sm"
+              >
+                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
 
-      <div className="control-section">
-        <h2>Selection Range</h2>
-        
-        <div className="control-item">
-          <label>
-            Selection Start: {selectionStartSampleIx.toFixed(0)} samples
-            <input
-              type="range"
-              min={0}
-              max={audioBuffer?.length || 0}
-              step={1}
+      {/* Main Controls Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* Selection Range */}
+        <Card>
+          <CardHeader className="pb-2 px-4 pt-4">
+            <CardTitle className="text-sm font-semibold">Selection Range</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 px-4 pb-4">
+            <ControlSlider
+              label="Start"
               value={selectionStartSampleIx}
-              onChange={(e) => setSelectionStartSampleIx(Number(e.target.value))}
-            />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Selection End: {selectionEndSampleIx.toFixed(0)} samples
-            <input
-              type="range"
+              onChange={setSelectionStartSampleIx}
               min={0}
-              max={audioBuffer?.length || 0}
-              step={1}
-              value={selectionEndSampleIx}
-              onChange={(e) => setSelectionEndSampleIx(Number(e.target.value))}
+              max={maxLength}
+              format={(v) => `${v.toFixed(0)} samples`}
             />
-          </label>
-        </div>
-      </div>
+            <ControlSlider
+              label="End"
+              value={selectionEndSampleIx}
+              onChange={setSelectionEndSampleIx}
+              min={0}
+              max={maxLength}
+              format={(v) => `${v.toFixed(0)} samples`}
+            />
+          </CardContent>
+        </Card>
 
-      <div className="control-section">
-        <h2>Grain Properties</h2>
-        
-        <div className="control-item">
-          <label>
-            Grain Size: {grainSize.toFixed(0)} samples
-            <input
-              type="range"
+        {/* Grain Properties */}
+        <Card>
+          <CardHeader className="pb-2 px-4 pt-4">
+            <CardTitle className="text-sm font-semibold">Grain Properties</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 px-4 pb-4">
+            <ControlSlider
+              label="Size"
+              value={grainSize}
+              onChange={setGrainSize}
               min={128}
               max={8192}
               step={64}
-              value={grainSize}
-              onChange={(e) => setGrainSize(Number(e.target.value))}
+              format={(v) => `${v.toFixed(0)} samples`}
             />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Linear Slope Length: {formatValue(linearSlopeLength)}
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
+            <ControlSlider
+              label="Linear Slope"
               value={linearSlopeLength}
-              onChange={(e) => setLinearSlopeLength(Number(e.target.value))}
-            />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Slope Linearity: {formatValue(slopeLinearity)}
-            <input
-              type="range"
+              onChange={setLinearSlopeLength}
               min={0}
               max={1}
               step={0.01}
+              format={(v) => formatValue(v)}
+            />
+            <ControlSlider
+              label="Slope Linearity"
               value={slopeLinearity}
-              onChange={(e) => setSlopeLinearity(Number(e.target.value))}
+              onChange={setSlopeLinearity}
+              min={0}
+              max={1}
+              step={0.01}
+              format={(v) => formatValue(v)}
             />
-          </label>
-        </div>
-      </div>
+          </CardContent>
+        </Card>
 
-      <div className="control-section">
-        <h2>Voice 1 Controls</h2>
-        
-        <div className="control-item">
-          <label>
-            Filter Cutoff: {voice1FilterCutoff.toFixed(0)} Hz (positive=lowpass, negative=highpass)
-            <input
-              type="range"
-              min={-20000}
-              max={20000}
-              step={100}
+        {/* Voice 1 */}
+        <Card>
+          <CardHeader className="pb-2 px-4 pt-4">
+            <CardTitle className="text-sm font-semibold">Voice 1</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2.5 px-4 pb-4">
+            <ControlSlider
+              label="Filter Cutoff"
               value={voice1FilterCutoff}
-              onChange={(e) => setVoice1FilterCutoff(Number(e.target.value))}
-            />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Movement Speed: {formatValue(voice1MovementSamplesPerSample, 3)} samples/sample
-            <input
-              type="range"
-              min={-2}
-              max={2}
-              step={0.01}
-              value={voice1MovementSamplesPerSample}
-              onChange={(e) => setVoice1MovementSamplesPerSample(Number(e.target.value))}
-            />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Sample Speed Ratio: {formatValue(voice1SampleSpeedRatio, 2)}
-            <input
-              type="range"
-              min={0.1}
-              max={4}
-              step={0.01}
-              value={voice1SampleSpeedRatio}
-              onChange={(e) => setVoice1SampleSpeedRatio(Number(e.target.value))}
-            />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Samples Between Grains: {voice1SamplesBetweenGrains.toFixed(0)}
-            <input
-              type="range"
-              min={1}
-              max={2000}
-              step={1}
-              value={voice1SamplesBetweenGrains}
-              onChange={(e) => setVoice1SamplesBetweenGrains(Number(e.target.value))}
-            />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Gain: {formatValue(voice1Gain)}
-            <input
-              type="range"
-              min={0}
-              max={2}
-              step={0.01}
-              value={voice1Gain}
-              onChange={(e) => setVoice1Gain(Number(e.target.value))}
-            />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Grain Start Randomness: {voice1GrainStartRandomnessSamples.toFixed(0)} samples
-            <input
-              type="range"
-              min={0}
-              max={1000}
-              step={10}
-              value={voice1GrainStartRandomnessSamples}
-              onChange={(e) => setVoice1GrainStartRandomnessSamples(Number(e.target.value))}
-            />
-          </label>
-        </div>
-      </div>
-
-      <div className="control-section">
-        <h2>Voice 2 Controls</h2>
-        
-        <div className="control-item">
-          <label>
-            Filter Cutoff: {voice2FilterCutoff.toFixed(0)} Hz
-            <input
-              type="range"
+              onChange={setVoice1FilterCutoff}
               min={-20000}
               max={20000}
               step={100}
-              value={voice2FilterCutoff}
-              onChange={(e) => setVoice2FilterCutoff(Number(e.target.value))}
+              format={(v) => `${v > 0 ? 'LP' : 'HP'} ${Math.abs(v).toFixed(0)}Hz`}
             />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Movement Speed: {formatValue(voice2MovementSamplesPerSample, 3)} samples/sample
-            <input
-              type="range"
+            <ControlSlider
+              label="Movement"
+              value={voice1MovementSamplesPerSample}
+              onChange={setVoice1MovementSamplesPerSample}
               min={-2}
               max={2}
               step={0.01}
-              value={voice2MovementSamplesPerSample}
-              onChange={(e) => setVoice2MovementSamplesPerSample(Number(e.target.value))}
+              format={(v) => formatValue(v, 3)}
             />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Sample Speed Ratio: {formatValue(voice2SampleSpeedRatio, 2)}
-            <input
-              type="range"
+            <ControlSlider
+              label="Speed Ratio"
+              value={voice1SampleSpeedRatio}
+              onChange={setVoice1SampleSpeedRatio}
               min={0.1}
               max={4}
               step={0.01}
-              value={voice2SampleSpeedRatio}
-              onChange={(e) => setVoice2SampleSpeedRatio(Number(e.target.value))}
+              format={(v) => formatValue(v, 2)}
             />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Samples Between Grains: {voice2SamplesBetweenGrains.toFixed(0)}
-            <input
-              type="range"
+            <ControlSlider
+              label="Between Grains"
+              value={voice1SamplesBetweenGrains}
+              onChange={setVoice1SamplesBetweenGrains}
               min={1}
               max={2000}
-              step={1}
-              value={voice2SamplesBetweenGrains}
-              onChange={(e) => setVoice2SamplesBetweenGrains(Number(e.target.value))}
+              format={(v) => `${v.toFixed(0)} samples`}
             />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Gain: {formatValue(voice2Gain)}
-            <input
-              type="range"
+            <ControlSlider
+              label="Gain"
+              value={voice1Gain}
+              onChange={setVoice1Gain}
               min={0}
               max={2}
               step={0.01}
-              value={voice2Gain}
-              onChange={(e) => setVoice2Gain(Number(e.target.value))}
+              format={(v) => formatValue(v)}
             />
-          </label>
-        </div>
-
-        <div className="control-item">
-          <label>
-            Grain Start Randomness: {voice2GrainStartRandomnessSamples.toFixed(0)} samples
-            <input
-              type="range"
+            <ControlSlider
+              label="Randomness"
+              value={voice1GrainStartRandomnessSamples}
+              onChange={setVoice1GrainStartRandomnessSamples}
               min={0}
               max={1000}
               step={10}
-              value={voice2GrainStartRandomnessSamples}
-              onChange={(e) => setVoice2GrainStartRandomnessSamples(Number(e.target.value))}
+              format={(v) => `${v.toFixed(0)} samples`}
             />
-          </label>
-        </div>
-      </div>
+          </CardContent>
+        </Card>
 
-      <div className="control-section">
-        <button onClick={processOffline} disabled={!audioBuffer || !granularInstance}>
-          Reprocess
-        </button>
-        <button 
-          onClick={handlePlay} 
-          disabled={!processedBuffer || !audioContext}
-        >
-          {isPlaying ? 'Stop' : 'Play Processed'}
-        </button>
+        {/* Voice 2 */}
+        <Card>
+          <CardHeader className="pb-2 px-4 pt-4">
+            <CardTitle className="text-sm font-semibold">Voice 2</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2.5 px-4 pb-4">
+            <ControlSlider
+              label="Filter Cutoff"
+              value={voice2FilterCutoff}
+              onChange={setVoice2FilterCutoff}
+              min={-20000}
+              max={20000}
+              step={100}
+              format={(v) => `${v > 0 ? 'LP' : 'HP'} ${Math.abs(v).toFixed(0)}Hz`}
+            />
+            <ControlSlider
+              label="Movement"
+              value={voice2MovementSamplesPerSample}
+              onChange={setVoice2MovementSamplesPerSample}
+              min={-2}
+              max={2}
+              step={0.01}
+              format={(v) => formatValue(v, 3)}
+            />
+            <ControlSlider
+              label="Speed Ratio"
+              value={voice2SampleSpeedRatio}
+              onChange={setVoice2SampleSpeedRatio}
+              min={0.1}
+              max={4}
+              step={0.01}
+              format={(v) => formatValue(v, 2)}
+            />
+            <ControlSlider
+              label="Between Grains"
+              value={voice2SamplesBetweenGrains}
+              onChange={setVoice2SamplesBetweenGrains}
+              min={1}
+              max={2000}
+              format={(v) => `${v.toFixed(0)} samples`}
+            />
+            <ControlSlider
+              label="Gain"
+              value={voice2Gain}
+              onChange={setVoice2Gain}
+              min={0}
+              max={2}
+              step={0.01}
+              format={(v) => formatValue(v)}
+            />
+            <ControlSlider
+              label="Randomness"
+              value={voice2GrainStartRandomnessSamples}
+              onChange={setVoice2GrainStartRandomnessSamples}
+              min={0}
+              max={1000}
+              step={10}
+              format={(v) => `${v.toFixed(0)} samples`}
+            />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
